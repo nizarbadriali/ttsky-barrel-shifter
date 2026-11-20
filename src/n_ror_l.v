@@ -34,14 +34,14 @@ module n_ror_l #(parameter N = 4)
     // Hint: x ^ 1 = ~x and x ^ 0 = x, so XOR each bit of k with left.
     //       {STAGES{left}} copies the 1-bit "left" STAGES times
     //       so it is the same width as k.
-    wire [STAGES-1:0] k_eff;   // = ???
+    wire [STAGES-1:0] k_eff = k ^ {STAGES{left}};
 
 
     // TODO (B): preshift row. pre = data_in rotated right by 1 when left = 1,
     //           otherwise data_in unchanged.
     // Hint: rotate right by 1 on 4 bits: {A3 A2 A1 A0} -> {A0 A3 A2 A1}.
     //       Use concatenation { , } and a part-select like data_in[N-1:1].
-    wire [N-1:0] pre;          // = ???
+    wire [N-1:0] pre = left ? {data_in[0], data_in[N-1:1]} : data_in;
 
 
     assign stage[N-1:0] = pre;                   // the rotate rows now start from the preshift
@@ -49,7 +49,15 @@ module n_ror_l #(parameter N = 4)
 
     // TODO (C): copy your Level 1 generate loops here.
     // Hint: only ONE thing changes. Which signal should select the muxes now?
-
+    genvar j, b;
+    generate
+        for (j = 0; j < STAGES; j = j + 1) begin : row
+            for (b = 0; b < N; b = b + 1) begin : mux
+                assign stage[(j+1)*N + b] = k_eff[j] ? stage[j*N + ((b + (1 << j)) % N)]
+                                                     : stage[j*N + b];
+            end
+        end
+    endgenerate
 
 
 endmodule

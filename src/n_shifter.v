@@ -30,10 +30,20 @@ module n_shifter #(parameter N = 4)
 
     // ---------------- Rotate core ----------------
     // TODO (A): copy k_eff, pre, and your generate loops from Level 2.
-    wire [STAGES-1:0] k_eff;
-    wire [N-1:0]      pre;
+    wire [STAGES-1:0] k_eff = k ^ {STAGES{left}};
+    wire [N-1:0]      pre   = left ? {data_in[0], data_in[N-1:1]} : data_in;
 
     assign stage[N-1:0] = pre;
+
+    genvar j, b;
+    generate
+        for (j = 0; j < STAGES; j = j + 1) begin : row
+            for (b = 0; b < N; b = b + 1) begin : mux
+                assign stage[(j+1)*N + b] = k_eff[j] ? stage[j*N + ((b + (1 << j)) % N)]
+                                                     : stage[j*N + b];
+            end
+        end
+    endgenerate
 
     wire [N-1:0] x = stage[STAGES*N +: N];   // rotation result ("X" in Fig 11.68c)
 
@@ -59,19 +69,25 @@ module n_shifter #(parameter N = 4)
     //              Right shift: wrapped bits are the k HIGHEST bits
     //                           -> therm, but bit-reversed. Which therm bit
     //                              corresponds to output bit b when reversed?
+    generate
+        for (b = 0; b < N; b = b + 1) begin : maskgen
+            assign therm[b] = (b < k);
+            assign mask[b]  = shift & (left ? therm[b] : therm[N-1-b]);
+        end
+    endgenerate
 
 
     // TODO (C): kill value.
     //   1 only for an arithmetic RIGHT shift of a negative number,
     //   otherwise 0. Which bit of data_in is the sign bit?
-    wire kill;   // = ???
+    wire kill = arithmetic & ~left & data_in[N-1];
 
 
     // TODO (D): output. Each bit is one 2:1 mux:
     //   mask[b] = 1 -> kill value,   mask[b] = 0 -> x[b]
     // Hint: you can do all N bits at once with bitwise operators,
     //       or with one more generate loop. {N{kill}} makes N copies of kill.
-    assign data_out = x;   // <- replace this line
+    assign data_out = (mask & {N{kill}}) | (~mask & x);
 
 
 
